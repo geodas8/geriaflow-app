@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>GeriaFlow v0.10 · Togo — Cockpit &amp; Collecte Collaborative Gériatrique</title>
+  <title>GeriaFlow v0.11 · Togo — Cockpit &amp; Collecte Collaborative Gériatrique</title>
 
   <!-- Google Fonts : DM Serif Display (titres éditoriaux) & DM Sans (interface clinique lisible) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -182,7 +182,7 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="font-editorial text-lg sm:text-xl text-slateink-dark leading-none">GeriaFlow</span>
-            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sand text-slateink border border-borderline">v0.4</span>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sand text-slateink border border-borderline">v0.11</span>
           </div>
           <p id="storage-mode-indicator" class="text-[11px] text-slateink-muted leading-tight mt-0.5">
             Atlas gériatrique collaboratif
@@ -1669,15 +1669,15 @@ CREATE POLICY "Acces prototype lecture ecriture"
       if (state.currentRole === "doctor") {
         roleInfo = { badge: "Médecin · Cockpit", name: "Dr. Yaovi Dossou", sub: "Accès complet (4+ dossiers)" };
         navItems = [
-          { key: "overview", label: "Synthèse & 12 Domaines", short: "Synthèse", badge: evalRes.globalStatus },
-          { key: "followup", label: "Suivi du patient", short: "Suivi", badge: "" },
+          { key: "overview", label: "Aujourd'hui", short: "Aujourd'hui", badge: "" },
+          { key: "followup", label: "Courbes de suivi", short: "Courbes", badge: "" },
           { key: "events", label: "Événements", short: "Événements", badge: allEvents().length },
-          { key: "global", label: "Vue globale", short: "Globale", badge: "" },
-          { key: "cascade", label: "Outils complets (cascade)", short: "Cascade", badge: pendingLong(patient).length },
-          { key: "pretest", label: "Validation pré-test", short: "Pré-test", badge: "" },
-          { key: "alerts", label: "Alertes explicables", short: "Alertes", badge: evalRes.alerts.length + evalRes.discordances.length },
-          { key: "protocols", label: "Problématiques & Protocoles", short: "Protocoles", badge: patient.activeProtocols.length },
-          { key: "history", label: "Chronologie & Affectations", short: "Suivi & Équipe", badge: "" }
+          { key: "cascade", label: "Outils complets", short: "Outils", badge: pendingLong(patient).length },
+          { key: "global", label: "Tous les patients", short: "Patients", badge: "" },
+          { key: "alerts", label: "Alertes expliquées", short: "", badge: evalRes.alerts.length + evalRes.discordances.length, more: true },
+          { key: "protocols", label: "Protocoles", short: "", badge: patient.activeProtocols.length, more: true },
+          { key: "history", label: "Chronologie & équipe", short: "", badge: "", more: true },
+          { key: "pretest", label: "Validation pré-test", short: "", badge: "", more: true }
         ];
         govText = "Gouvernance Médecin : vue transversale sur tous les dossiers, règles REG_01 à REG_12, validation des protocoles et affectation des équipes.";
       } else if (state.currentRole === "as") {
@@ -1689,7 +1689,7 @@ CREATE POLICY "Acces prototype lecture ecriture"
           { key: "as_form", label: "Formulaire Visite Terrain", short: "Saisie Visite", badge: "" },
           { key: "as_patients", label: "Mes patients attribués", short: "Mes Patients", badge: visiblePatients.length }
         ];
-        govText = "Gouvernance AS : accès limité aux patients attribués. Mesures biométriques objectives prioritaires (REG_11), sans modification de prescription.";
+        govText = "Gouvernance AS : accès limité aux patients attribués. Vous voyez les alertes de la famille et pouvez explorer chaque domaine ; aucune modification de prescription.";
       } else {
         const isFatima = state.currentRole === "family_fatima";
         roleInfo = {
@@ -1704,9 +1704,11 @@ CREATE POLICY "Acces prototype lecture ecriture"
         govText = "Espace Aidant : interface simplifiée d'observation quotidienne. Les alertes cliniques médicales sont masquées ; aucune modification d'ordonnance possible.";
       }
 
-      if (!navItems.some((n) => n.key === state.activeSubView)) {
+      if (!navItems.some((n) => n.key === state.activeSubView) && state.activeSubView !== "more") {
         state.activeSubView = navItems[0].key;
       }
+      const mainNav = navItems.filter((n) => !n.more), moreNav = navItems.filter((n) => n.more);
+      state._moreItems = moreNav;
 
       // Carte profil rail desktop
       document.getElementById("rail-profile-card").innerHTML = `
@@ -1718,7 +1720,7 @@ CREATE POLICY "Acces prototype lecture ecriture"
       `;
 
       // Liens rail desktop
-      document.getElementById("desktop-nav-links").innerHTML = navItems.map((item) => {
+      const navBtn = (item, sec) => {
         const active = state.activeSubView === item.key;
         return `
           <button type="button" onclick="switchSubView('${item.key}')"
@@ -1731,12 +1733,13 @@ CREATE POLICY "Acces prototype lecture ecriture"
             ${item.badge !== "" ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${active ? "bg-white/20 text-white" : "bg-sand text-slateink-dark border border-borderline"}">${item.badge}</span>` : ""}
           </button>
         `;
-      }).join("");
-
+      };
+      document.getElementById("desktop-nav-links").innerHTML = mainNav.map((i) => navBtn(i)).join("") +
+        (moreNav.length ? `<p class="px-3.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slateink-muted">Plus</p>` + moreNav.map((i) => navBtn(i)).join("") : "");
       document.getElementById("rail-governance-note").textContent = govText;
 
       // Barre inférieure mobile
-      document.getElementById("mobile-bottom-nav").innerHTML = navItems.map((item) => {
+      document.getElementById("mobile-bottom-nav").innerHTML = mainNav.concat(moreNav.length ? [{ key: "more", short: "Plus", badge: "" }] : []).map((item) => {
         const active = state.activeSubView === item.key;
         return `
           <button type="button" onclick="switchSubView('${item.key}')"
@@ -1784,159 +1787,6 @@ CREATE POLICY "Acces prototype lecture ecriture"
     // =========================================================================
     // 7. VUES MÉDECIN (DASHBOARD DÉCISIONNEL SANS CHRONOMÈTRE)
     // =========================================================================
-    function renderDoctorOverview(patient, evalRes) {
-      const { domainCards, alerts, discordances, computed } = evalRes;
-
-      // Encadré synthèse des alertes prioritaires & discordances en haut du dashboard
-      let topAlertsHtml = "";
-      if (discordances.length > 0) {
-        topAlertsHtml += `
-          <div class="p-4 rounded-2xl bg-lavender-light border-2 border-lavender space-y-2">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="px-2.5 py-0.5 rounded-lg text-[11px] font-extrabold uppercase bg-lavender-dark text-white">
-                Discordance Famille / AS (${discordances.length}) · REG_11
-              </span>
-              <span class="text-xs font-bold text-lavender-dark">Préséance AS appliquée au scoring</span>
-            </div>
-            <ul class="list-disc pl-5 space-y-1 text-xs text-slateink-dark">
-              ${discordances.map((d) => `<li><strong>${d.title} :</strong> ${d.proof}</li>`).join("")}
-            </ul>
-          </div>
-        `;
-      }
-
-      if (alerts.length === 0 && discordances.length === 0) {
-        topAlertsHtml += `
-          <div class="p-4 rounded-2xl bg-sage-light/70 border border-sage flex items-center justify-between gap-3">
-            <div>
-              <h3 class="font-bold text-sm text-sage-dark">Aucune alerte active sur les 12 domaines cliniques</h3>
-              <p class="text-xs text-slateink mt-0.5">Toutes les observations familiales et mesures soignantes sont dans les seuils de stabilité.</p>
-            </div>
-            <span class="px-3 py-1 rounded-xl text-xs font-extrabold bg-sage-dark text-white shrink-0">12/12 VERT</span>
-          </div>
-        `;
-      } else if (alerts.length > 0) {
-        topAlertsHtml += `
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            ${alerts.slice(0, 4).map((al) => {
-              const isRed = al.severity === "ROUGE";
-              return `
-                <div class="p-4 rounded-2xl border-2 ${isRed ? "bg-coral-light border-coral" : "bg-amberwarm-light border-amberwarm"} space-y-1.5">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${isRed ? "bg-coral-dark text-white" : "bg-amberwarm-dark text-white"}">
-                      ${al.severity} · ${al.rule} (${al.domains.join(", ")})
-                    </span>
-                    <button type="button" onclick="switchSubView('alerts')" class="text-[11px] font-bold underline text-slateink-dark cursor-pointer">
-                      Détails →
-                    </button>
-                  </div>
-                  <h4 class="font-bold text-sm text-slateink-dark">${al.title}</h4>
-                  <p class="text-xs text-slateink leading-relaxed">${al.proof}</p>
-                </div>
-              `;
-            }).join("")}
-          </div>
-        `;
-      }
-
-      // Bandeau biomarqueurs clés AS
-      const metricsBarHtml = patient.asVisit.active ? `
-        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
-          <div class="p-3 rounded-xl bg-paper border border-borderline">
-            <span class="text-[11px] text-slateink-muted block">Vitesse marche 4m</span>
-            <strong class="text-sm sm:text-base font-extrabold ${computed.walkSpeed < 0.6 ? "text-coral-dark" : computed.walkSpeed < 0.8 ? "text-amberwarm-dark" : "text-sage-dark"}">${computed.walkSpeed} m/s</strong>
-          </div>
-          <div class="p-3 rounded-xl bg-paper border border-borderline">
-            <span class="text-[11px] text-slateink-muted block">Poids (vs T0)</span>
-            <strong class="text-sm sm:text-base font-extrabold ${computed.weightDeltaPct <= -5 ? "text-coral-dark" : computed.weightDeltaPct <= -3 ? "text-amberwarm-dark" : "text-slateink-dark"}">${patient.asVisit.weight} kg (${computed.weightDeltaPct > 0 ? "+" : ""}${computed.weightDeltaPct}%)</strong>
-          </div>
-          <div class="p-3 rounded-xl bg-paper border border-borderline">
-            <span class="text-[11px] text-slateink-muted block">Mini-MNA-SF</span>
-            <strong class="text-sm sm:text-base font-extrabold ${patient.asVisit.miniMnaSf <= 11 ? "text-amberwarm-dark" : "text-sage-dark"}">${patient.asVisit.miniMnaSf} / 14</strong>
-          </div>
-          <div class="p-3 rounded-xl bg-paper border border-borderline">
-            <span class="text-[11px] text-slateink-muted block">ADL / IADL-4</span>
-            <strong class="text-sm sm:text-base font-extrabold ${computed.adlScore < 6 || computed.iadlScore < 4 ? "text-amberwarm-dark" : "text-sage-dark"}">${computed.adlScore}/6 · ${computed.iadlScore}/4</strong>
-          </div>
-          <div class="p-3 rounded-xl bg-paper border border-borderline">
-            <span class="text-[11px] text-slateink-muted block">Mini-GDS / Braden</span>
-            <strong class="text-sm sm:text-base font-extrabold ${computed.miniGdsScore >= 2 || computed.bradenScore <= 18 ? "text-amberwarm-dark" : "text-slateink-dark"}">${computed.miniGdsScore}/4 · ${computed.bradenScore}/23</strong>
-          </div>
-          <div class="p-3 rounded-xl bg-paper border border-borderline">
-            <span class="text-[11px] text-slateink-muted block">Observance pilulier</span>
-            <strong class="text-sm sm:text-base font-extrabold ${patient.asVisit.adherencePct < 80 ? "text-coral-dark" : "text-sage-dark"}">${patient.asVisit.adherencePct}% (${patient.asVisit.medsCount} méd.)</strong>
-          </div>
-        </div>
-      ` : "";
-
-      // Matrice des 12 domaines cliniques
-      const cardsHtml = domainCards.map((dom) => {
-        let badgeTxt = "VERT";
-        let badgeStyle = "bg-sage-light text-sage-dark border-sage";
-        let cardBorder = "border-borderline";
-
-        if (dom.level === 3) {
-          badgeTxt = "ROUGE";
-          badgeStyle = "bg-coral-dark text-white border-coral-dark";
-          cardBorder = "border-coral bg-coral-light/25";
-        } else if (dom.level === 2) {
-          badgeTxt = "ORANGE";
-          badgeStyle = "bg-amberwarm-dark text-white border-amberwarm-dark";
-          cardBorder = "border-amberwarm bg-amberwarm-light/25";
-        } else if (dom.level === 1) {
-          badgeTxt = "VIGILANCE";
-          badgeStyle = "bg-amberwarm-light text-amberwarm-dark border-amberwarm";
-        }
-
-        const isAs = dom.source.startsWith("AS");
-
-        return `
-          <div class="p-4 rounded-2xl bg-paper border ${cardBorder} flex flex-col justify-between space-y-2.5 shadow-2xs">
-            <div class="space-y-1.5">
-              <div class="flex items-start justify-between gap-2">
-                <h4 class="font-bold text-xs sm:text-sm text-slateink-dark leading-snug">${dom.fullName}</h4>
-                <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${badgeStyle}">${badgeTxt}</span>
-              </div>
-
-              <div class="flex flex-wrap items-center gap-1.5">
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md ${isAs ? "bg-tealatlas-light text-tealatlas-dark" : "bg-sand text-slateink"}">
-                  ${dom.source}
-                </span>
-                ${dom.hasDiscordance ? `<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-lavender-dark text-white">Discordance</span>` : ""}
-                ${dom.protocolActive ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sage-light text-sage-dark">Protocole actif</span>` : ""}
-              </div>
-
-              <p class="text-xs text-slateink font-medium leading-relaxed pt-0.5">${dom.evidence}</p>
-            </div>
-
-            <div class="pt-2 border-t border-borderline/70 flex items-center justify-between gap-2 text-[11px]">
-              <span class="text-slateink-muted truncate" title="${dom.tools}">${dom.tools}</span>
-              <button type="button" onclick="toggleProtocol('${dom.code}')"
-                class="shrink-0 font-bold text-tealatlas-dark hover:underline cursor-pointer">
-                ${dom.protocolActive ? "✓ Protocole" : "+ Protocole"}
-              </button>
-            </div>
-          </div>
-        `;
-      }).join("");
-
-      return `
-        <div class="space-y-5">
-          ${topAlertsHtml}
-          ${metricsBarHtml}
-          <div class="space-y-2.5">
-            <div class="flex items-center justify-between">
-              <h3 class="font-editorial text-lg sm:text-xl text-slateink-dark">Matrice longitudinale des 12 domaines cliniques</h3>
-              <span class="text-xs text-slateink-muted">Règle de préséance : AS &gt; Famille</span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-              ${cardsHtml}
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
     function renderDoctorAlerts(patient, evalRes) {
       const { alerts, discordances } = evalRes;
 
@@ -2324,19 +2174,22 @@ CREATE POLICY "Acces prototype lecture ecriture"
     function submitAsVisitForm() {
       const pat = getActivePatient();
       pat.asVisit.active = true;
-      pat.asVisit.updatedAt = "À l'instant (Essi Lawson · AS)";
-      logAsObservations(pat);
-      recordVisit(pat, "as", "Essi Lawson (AS)");
+      const at = obsDateISO(), back = isBackdated();
+      const lastAs = (pat.visits || []).filter((v) => v.role === "as").reduce((m, v) => (v.at > m ? v.at : m), "");
+      if (!lastAs || at >= lastAs) pat.asVisit.updatedAt = whenLabel(at, "Essi Lawson · AS");
+      logAsObservations(pat, at);
+      recordVisit(pat, "as", "Essi Lawson (AS)", at);
       const evalRes = evaluatePatientClinical(pat);
       pat.timeline.unshift({
-        date: "À l'instant",
+        date: back ? `Visite du ${frDate(at)}` : "À l'instant",
         author: "Essi Lawson (AS)",
         role: "as",
         text: `Enregistrement visite modulaire (${state.selectedFormDomains.join(", ")}) — Statut recalculé : ${evalRes.globalStatus}${evalRes.discordances.length ? ` (${evalRes.discordances.length} discordance(s))` : ""}.`
       });
+      obsDateValue = "";
       saveState();
       renderApp();
-      showToast(`Visite enregistrée pour ${pat.name}. Alertes et discordances recalculées en direct !`);
+      showToast(`Visite${back ? " du " + frDate(at) : ""} enregistrée pour ${pat.name}. Alertes et discordances recalculées en direct !`);
     }
 
     function renderAsFormView(patient, evalRes) {
@@ -2798,6 +2651,7 @@ CREATE POLICY "Acces prototype lecture ecriture"
 
       return `
         <div class="space-y-5">
+          ${dateBarHtml()}
           <!-- Sélecteur de briques modulaires -->
           <div class="bg-paper rounded-2xl border border-borderline p-4 sm:p-5 space-y-3">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -2884,18 +2738,21 @@ CREATE POLICY "Acces prototype lecture ecriture"
     function submitFamilyObsForm() {
       const pat = getActivePatient();
       const authorName = state.currentRole === "family_fatima" ? "Fatima Mensah (Aidante)" : "Kodjo Amegan (Aidant)";
-      pat.familyObs.updatedAt = `À l'instant (${authorName.split(" (")[0]})`;
-      logFamilyObservations(pat, authorName);
-      recordVisit(pat, "family", authorName);
+      const at = obsDateISO(), back = isBackdated();
+      const lastFam = (pat.visits || []).filter((v) => v.role === "family").reduce((m, v) => (v.at > m ? v.at : m), "");
+      if (!lastFam || at >= lastFam) pat.familyObs.updatedAt = whenLabel(at, authorName.split(" (")[0]);
+      logFamilyObservations(pat, authorName, at);
+      recordVisit(pat, "family", authorName, at);
       pat.timeline.unshift({
-        date: "À l'instant",
+        date: back ? `Obs. du ${frDate(at)}` : "À l'instant",
         author: authorName,
         role: "family",
         text: `Saisie d'observation familiale sur les domaines : ${state.selectedFormDomains.join(", ")}.`
       });
+      obsDateValue = "";
       saveState();
       renderApp();
-      showToast(`Merci ! Vos observations pour ${pat.name} ont été transmises à l'équipe soignante.`);
+      showToast(`Merci ! Vos observations${back ? " du " + frDate(at) : ""} pour ${pat.name} ont été transmises à l'équipe soignante.`);
     }
 
     // Planche illustrée SVG des 7 types de l'Échelle de Bristol
@@ -3150,6 +3007,7 @@ CREATE POLICY "Acces prototype lecture ecriture"
 
       return `
         <div class="space-y-5">
+          ${dateBarHtml()}
           <!-- Choix des domaines à renseigner -->
           <div class="bg-paper rounded-2xl border border-borderline p-4 sm:p-5 space-y-3">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -3475,23 +3333,23 @@ CREATE POLICY "Acces prototype lecture ecriture"
     const REEVAL_DAYS = 30; // délai de réévaluation (à fixer avec l'équipe)
     const FAM_OBS_KEYS = { D01: ["falls", "nearFalls"], D02: ["portions", "looseClothes"], D03: ["waterGlasses"], D04: ["bristol"], D05: ["urineLeaks"], D06: ["brutalConfusion", "progressiveMemory"], D07: ["sadness", "sleepTrouble"], D08: ["adlHelp"], D09: ["sensoryTrouble"], D10: ["painLevel"], D11: ["medsForgotten", "dizziness", "caregiverExhaustion"] };
 
-    function logObs(pat, role, author, domain, key, value) {
+    function logObs(pat, role, author, domain, key, value, atIso) {
       state.observations = state.observations || [];
-      const at = new Date().toISOString();
+      const at = atIso || new Date().toISOString();
       state.observations.push({ uid: newUid(), pid: pat.id, at, role, author, domain, key, value });
     }
-    function logAsObservations(pat) {
+    function logAsObservations(pat, at) {
       const a = pat.asVisit;
       const m = { D01: { walkTime4m: a.walkTime4m, chairStand5: a.chairStand5 }, D02: { weight: a.weight, calfCm: a.calfCircumference, miniMnaSf: a.miniMnaSf }, D06: { recall4: a.cogRecallScore }, D07: { miniGds: sumArray(a.miniGdsItems) }, D08: { adl: sumArray(a.adlItems), iadl: sumArray(a.iadlItems) }, D11: { adherencePct: a.adherencePct, medsCount: a.medsCount }, D12: { pasLying: a.pasLying, padLying: a.padLying, pasStand1: a.pasStanding1, padStand1: a.padStanding1, spo2: a.spo2, temp: a.temp } };
-      state.selectedFormDomains.forEach((d) => Object.entries(m[d] || {}).forEach(([k, v]) => logObs(pat, "as", "Essi Lawson (AS)", d, k, v)));
+      state.selectedFormDomains.forEach((d) => Object.entries(m[d] || {}).forEach(([k, v]) => logObs(pat, "as", "Essi Lawson (AS)", d, k, v, at)));
     }
-    function logFamilyObservations(pat, author) {
+    function logFamilyObservations(pat, author, at) {
       const f = pat.familyObs;
-      state.selectedFormDomains.forEach((d) => (FAM_OBS_KEYS[d] || []).forEach((k) => logObs(pat, "family", author, d, k, f[k])));
+      state.selectedFormDomains.forEach((d) => (FAM_OBS_KEYS[d] || []).forEach((k) => logObs(pat, "family", author, d, k, f[k], at)));
     }
     function lastObsDate(pid) {
       const o = (state.observations || []).filter((x) => x.pid === pid);
-      return o.length ? new Date(o[o.length - 1].at) : null;
+      return o.length ? new Date(o.reduce((m, x) => (x.at > m ? x.at : m), o[0].at)) : null;
     }
     function daysSince(d) { return d ? Math.floor((Date.now() - d.getTime()) / 86400000) : null; }
 
@@ -3527,7 +3385,7 @@ CREATE POLICY "Acces prototype lecture ecriture"
       }).join("");
       return `<div class="animate-view space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="font-editorial text-2xl text-slateink-dark">Vue globale · ${pats.length} dossiers</h2>
-        <div class="flex flex-wrap items-center gap-2"><label class="tap-card px-3 py-1.5 rounded-xl bg-tealatlas-dark text-white text-xs font-bold cursor-pointer">Charger des dossiers (CSV)<input type="file" accept=".csv,.txt" class="hidden" onchange="importPatientsCsv(this)" /></label><label class="flex items-center gap-1 text-[11px] text-slateink-mid"><input id="imp-replace" type="checkbox" checked /> remplacer les dossiers de démonstration</label><button onclick="exportObsCsv()" class="tap-card px-3 py-1.5 rounded-xl bg-paper border border-borderline text-xs font-bold text-slateink-dark">Exporter les observations (CSV)</button></div></div>
+        <div class="flex flex-wrap items-center gap-2"><label class="tap-card px-3 py-1.5 rounded-xl bg-tealatlas-dark text-white text-xs font-bold cursor-pointer">Charger des dossiers (CSV)<input type="file" accept=".csv,.txt" class="hidden" onchange="importPatientsCsv(this)" /></label><label class="flex items-center gap-1 text-[11px] text-slateink-mid"><input id="imp-replace" type="checkbox" checked /> remplacer les dossiers de démonstration</label><label class="tap-card px-3 py-1.5 rounded-xl bg-tealatlas-dark text-white text-xs font-bold cursor-pointer">Charger l'historique des mesures (CSV)<input type="file" accept=".csv,.txt" class="hidden" onchange="importHistoryCsv(this)" /></label><button onclick="exportObsCsv()" class="tap-card px-3 py-1.5 rounded-xl bg-paper border border-borderline text-xs font-bold text-slateink-dark">Exporter les observations (CSV)</button></div></div>
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">${tile(allEvents().length, "Événements ouverts")}${tile(nRed, "Rouge")}${tile(nOr, "Orange")}${tile(res.reduce((s, x) => s + pendingLong(x.p).length, 0), "Outils complets à faire")}${tile(due.length, "À réévaluer (>" + REEVAL_DAYS + " j)")}</div>
         <div class="p-4 rounded-2xl bg-paper border border-borderline overflow-x-auto"><table class="w-full"><thead><tr class="text-[11px] uppercase text-slateink-muted"><th class="text-left">Domaine</th><th>Vert</th><th>Vigil.</th><th>Orange</th><th>Rouge</th></tr></thead><tbody>${domRows}</tbody></table></div>
         <ul class="p-4 rounded-2xl bg-paper border border-borderline">${list}</ul></div>`;
@@ -3692,7 +3550,7 @@ CREATE POLICY "Acces prototype lecture ecriture"
     // v0.8 · ÉVÉNEMENTS : chaque profil lance ses alertes, l'AS et le médecin les explorent
     // =====================================================================
     function weightLoss(p) {
-      const w = (state.observations || []).filter((o) => o.pid === p.id && o.domain === "D02" && o.key === "weight").map((o) => ({ at: new Date(o.at).getTime(), v: Number(o.value) }));
+      const w = (state.observations || []).filter((o) => o.pid === p.id && o.domain === "D02" && o.key === "weight").map((o) => ({ at: new Date(o.at).getTime(), v: Number(o.value) })).sort((a, b) => a.at - b.at);
       const out = { p30: 0, p180: 0 };
       if (w.length < 2) return out;
       const cur = w[w.length - 1];
@@ -3952,27 +3810,349 @@ CREATE POLICY "Acces prototype lecture ecriture"
     }
     function logout() {
       const cloud = isCloud();
-      session = null;
+      session = null; obsDateValue = "";
       if (cloud) { dirty.clear(); state = createInitialState(); state.patients = []; state.observations = []; }
       try { window.sessionStorage.removeItem("geriaflow_session"); } catch (e) {}
       renderApp();
     }
 
-    function recordVisit(pat, role, author) {
+    function recordVisit(pat, role, author, atIso) {
       pat.visits = pat.visits || [];
       const r = evaluatePatientClinical(pat);
-      const v = { at: new Date().toISOString(), role, author, status: r.globalStatus, levels: Object.fromEntries(r.domainCards.map((c) => [c.code, c.level])) };
+      const v = { at: atIso || new Date().toISOString(), role, author, status: r.globalStatus, levels: Object.fromEntries(r.domainCards.map((c) => [c.code, c.level])) };
       pat.visits.push(v);
+      pat.visits.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
     }
+
+    // =====================================================================
+    // v0.11 · DATE D'OBSERVATION, COURBES DE SUIVI, ACCUEIL MÉDECIN SIMPLIFIÉ
+    // =====================================================================
+    let obsDateValue = "";
+    function pad2(n) { return String(n).padStart(2, "0"); }
+    function dateStr(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+    function todayStr() { return dateStr(new Date()); }
+    function isBackdated() { return !!obsDateValue && obsDateValue < todayStr(); }
+    function obsDateISO() {
+      if (!isBackdated()) return new Date().toISOString();
+      const p = obsDateValue.split("-").map(Number), n = new Date();
+      return new Date(p[0], p[1] - 1, p[2], n.getHours(), n.getMinutes(), n.getSeconds()).toISOString();
+    }
+    function frDate(iso) { return new Date(iso).toLocaleDateString("fr-FR"); }
+    function setObsDate(v) { obsDateValue = v && v < todayStr() ? v : ""; renderApp(); }
+    function whenLabel(at, who) { return isBackdated() ? `Observation du ${frDate(at)} (${who})` : `À l'instant (${who})`; }
+    function dateBarHtml() {
+      const t = new Date(), y = new Date(); y.setDate(y.getDate() - 1);
+      const mn = new Date(); mn.setFullYear(mn.getFullYear() - 1);
+      const back = isBackdated();
+      const chip = (on) => `tap-card px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${on ? "bg-slateink-dark text-white border-slateink-dark" : "bg-ivory text-slateink-dark border-borderline hover:bg-sand"}`;
+      return `<div class="p-3.5 rounded-2xl bg-paper border border-borderline flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+        <div><span class="text-sm font-extrabold text-slateink-dark">Date de l'observation</span>
+        <p class="text-xs text-slateink-muted">${back ? "Saisie datée du <strong>" + frDate(obsDateISO()) + "</strong> : elle prendra sa place dans le suivi à cette date." : "Par défaut : aujourd'hui. Vous pouvez saisir une observation passée."}</p></div>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button type="button" onclick="setObsDate('')" class="${chip(!back)}">Aujourd'hui</button>
+          <button type="button" onclick="setObsDate('${dateStr(y)}')" class="${chip(obsDateValue === dateStr(y))}">Hier</button>
+          <input type="date" value="${back ? obsDateValue : dateStr(t)}" min="${dateStr(mn)}" max="${dateStr(t)}" onchange="setObsDate(this.value)" class="px-2.5 py-1.5 rounded-xl border border-borderline text-xs font-bold text-slateink-dark bg-ivory" aria-label="Choisir la date de l'observation" />
+        </div></div>`;
+    }
+
+    // ---- Définition des courbes : bandes = niveaux du moteur (seuils provisoires) ----
+    const BAND_FILL = [["#8eb4a3", 0.13], ["#b79a62", 0.13], ["#b79a62", 0.26], ["#c99286", 0.30]];
+    const LVL_COL = ["#367361", "#85672c", "#9e4737", "#9e4737"];
+    const INF = 1e9;
+    const CURVES = [
+      { key: "weight", obs: "weight", dom: "D02", label: "Poids", unit: "kg", dec: 1, better: "up", guide: "weight" },
+      { key: "miniMnaSf", obs: "miniMnaSf", dom: "D02", label: "Mini-MNA (court)", unit: "/14", dec: 0, better: "up", domain: [0, 14], bands: [{ lo: 11.5, hi: INF, lvl: 0, t: "12–14 normal" }, { lo: 7.5, hi: 11.5, lvl: 1, t: "8–11 vigilance" }, { lo: -1, hi: 7.5, lvl: 2, t: "≤ 7 orange" }] },
+      { key: "mnaFull", obs: "mnaFull", dom: "D02", label: "MNA complète", unit: "/30", dec: 1, better: "up", domain: [0, 30], bands: [{ lo: 24, hi: INF, lvl: 0, t: "≥ 24 normal" }, { lo: 17, hi: 24, lvl: 2, t: "17–23,5 risque" }, { lo: -1, hi: 17, lvl: 3, t: "< 17 dénutrition" }] },
+      { key: "calfCm", obs: "calfCm", dom: "D02", label: "Tour de mollet", unit: "cm", dec: 1, better: "up", domain: [24, null], autoHi: 40, bands: [{ lo: 31, hi: INF, lvl: 0, t: "≥ 31 cm" }, { lo: -1, hi: 31, lvl: 2, t: "< 31 cm" }] },
+      { key: "gds15", obs: "gds15", dom: "D07", label: "GDS-15", unit: "/15", dec: 0, better: "down", domain: [0, 15], bands: [{ lo: -1, hi: 5, lvl: 0, t: "< 5" }, { lo: 5, hi: 10, lvl: 2, t: "5–9 évocateur" }, { lo: 10, hi: INF, lvl: 3, t: "≥ 10 sévère probable" }] },
+      { key: "miniGds", obs: "miniGds", dom: "D07", label: "Mini-GDS", unit: "/4", dec: 0, better: "down", domain: [0, 4], bands: [{ lo: -1, hi: 0.5, lvl: 0, t: "0" }, { lo: 0.5, hi: 1.5, lvl: 1, t: "1" }, { lo: 1.5, hi: INF, lvl: 2, t: "≥ 2 orange" }] },
+      { key: "walkSpeed", obs: "walkTime4m", tf: (v) => (v > 0 ? +(4 / v).toFixed(2) : NaN), dom: "D01", label: "Vitesse de marche 4 m", unit: "m/s", dec: 2, better: "up", domain: [0, null], autoHi: 1.4, bands: [{ lo: 0.8, hi: INF, lvl: 0, t: "≥ 0,8" }, { lo: 0.6, hi: 0.8, lvl: 1, t: "0,6–0,8 vigilance" }, { lo: -1, hi: 0.6, lvl: 2, t: "< 0,6 orange" }] },
+      { key: "chairStand5", obs: "chairStand5", dom: "D01", label: "5 levers de chaise", unit: "s", dec: 0, better: "down", domain: [0, null], autoHi: 25, bands: [{ lo: -1, hi: 14.5, lvl: 0, t: "≤ 14 s" }, { lo: 14.5, hi: 20.5, lvl: 1, t: "15–20 s vigilance" }, { lo: 20.5, hi: INF, lvl: 2, t: "> 20 s orange" }] },
+      { key: "recall4", obs: "recall4", dom: "D06", label: "Rappel 3 mots + orientation", unit: "/4", dec: 0, better: "up", domain: [0, 4], bands: [{ lo: 3.5, hi: INF, lvl: 0, t: "4" }, { lo: 2.5, hi: 3.5, lvl: 1, t: "3 vigilance" }, { lo: -1, hi: 2.5, lvl: 2, t: "≤ 2 orange" }] },
+      { key: "adl", obs: "adl", dom: "D08", label: "ADL", unit: "/6", dec: 0, better: "up", domain: [0, 6], bands: [{ lo: 5.5, hi: INF, lvl: 0, t: "6 autonome" }, { lo: -1, hi: 5.5, lvl: 2, t: "< 6 orange" }] },
+      { key: "iadl", obs: "iadl", dom: "D08", label: "IADL-4", unit: "/4", dec: 0, better: "up", domain: [0, 4], bands: [{ lo: 3.5, hi: INF, lvl: 0, t: "4" }, { lo: 2.5, hi: 3.5, lvl: 1, t: "3 vigilance" }, { lo: -1, hi: 2.5, lvl: 2, t: "≤ 2 orange" }] },
+      { key: "adherencePct", obs: "adherencePct", dom: "D11", label: "Observance du pilulier", unit: "%", dec: 0, better: "up", domain: [0, 100], bands: [{ lo: 90, hi: INF, lvl: 0, t: "≥ 90 %" }, { lo: 80, hi: 90, lvl: 1, t: "80–89 % vigilance" }, { lo: -1, hi: 80, lvl: 2, t: "< 80 % orange" }] },
+      { key: "pas", multi: [{ obs: "pasLying", name: "PAS couché" }, { obs: "pasStand1", name: "PAS debout 1 min", dash: true }], dom: "D12", label: "Tension systolique", unit: "mmHg", dec: 0, better: null },
+      { key: "spo2", obs: "spo2", dom: "D12", label: "SpO₂", unit: "%", dec: 0, better: "up", domain: [85, 100], bands: [{ lo: 93.5, hi: INF, lvl: 0, t: "≥ 94 %" }, { lo: 91.5, hi: 93.5, lvl: 2, t: "92–93 orange" }, { lo: -1, hi: 91.5, lvl: 3, t: "≤ 91 rouge" }] },
+      { key: "temp", obs: "temp", dom: "D12", label: "Température", unit: "°C", dec: 1, better: "down", domain: [35.5, 40], bands: [{ lo: -1, hi: 37.5, lvl: 0, t: "< 37,5" }, { lo: 37.5, hi: 38, lvl: 1, t: "37,5–37,9" }, { lo: 38, hi: 38.5, lvl: 2, t: "38–38,4 orange" }, { lo: 38.5, hi: INF, lvl: 3, t: "≥ 38,5 rouge" }] },
+      { key: "waterGlasses", obs: "waterGlasses", dom: "D03", label: "Hydratation (aidant)", unit: "verres/j", dec: 0, better: "up", domain: [0, 8], bands: [{ lo: 5.5, hi: INF, lvl: 0, t: "≥ 6" }, { lo: 3.5, hi: 5.5, lvl: 1, t: "4–5" }, { lo: -1, hi: 3.5, lvl: 2, t: "< 4" }] },
+      { key: "painLevel", obs: "painLevel", dom: "D10", label: "Douleur (aidant)", unit: "/3", dec: 0, better: "down", domain: [0, 3], bands: [{ lo: -1, hi: 0.5, lvl: 0, t: "0" }, { lo: 0.5, hi: 2.5, lvl: 1, t: "1–2" }, { lo: 2.5, hi: INF, lvl: 2, t: "3" }] },
+      { key: "caregiverExhaustion", obs: "caregiverExhaustion", dom: "D11", label: "Fatigue de l'aidant", unit: "/3", dec: 0, better: "down", domain: [0, 3], bands: [{ lo: -1, hi: 0.5, lvl: 0, t: "0" }, { lo: 0.5, hi: 1.5, lvl: 1, t: "1" }, { lo: 1.5, hi: INF, lvl: 2, t: "≥ 2" }] }
+    ];
+    const fmtNum = (v, dec) => Number(v).toFixed(dec).replace(".", ",");
+    function zoneOf(def, v) {
+      if (!def.bands) return null;
+      const b = def.bands.find((x) => v >= x.lo && v < x.hi);
+      return b ? b.lvl : null;
+    }
+    function curveSeries(pid, def, days) {
+      const cut = isFinite(days) ? Date.now() - days * 86400000 : -Infinity;
+      const obs = (state.observations || []).filter((o) => o.pid === pid);
+      const mk = (key, tf) => obs
+        .filter((o) => o.key === key && o.value !== "" && o.value !== null && o.value !== undefined && isFinite(Number(o.value)))
+        .map((o) => ({ t: new Date(o.at).getTime(), v: tf ? tf(Number(o.value)) : Number(o.value), who: String(o.author || "").split(" (")[0] }))
+        .filter((p) => isFinite(p.v) && p.t >= cut)
+        .sort((a, b) => a.t - b.t);
+      if (def.multi) return def.multi.map((m) => ({ name: m.name, dash: m.dash, p: mk(m.obs) })).filter((s) => s.p.length);
+      return [{ name: def.label, p: mk(def.obs, def.tf) }].filter((s) => s.p.length);
+    }
+    function weightGuide(series) {
+      const p = (series[0] || { p: [] }).p;
+      if (p.length < 2) return null;
+      const last = p[p.length - 1];
+      const ref = p.find((x) => last.t - x.t <= 30 * 86400000 && x !== last);
+      return ref ? ref.v * 0.95 : null;
+    }
+    function chartSvg(def, series, mini) {
+      const W = mini ? 150 : 640, H = mini ? 46 : 250;
+      const pd = mini ? { l: 4, r: 6, t: 6, b: 6 } : { l: 42, r: 18, t: 14, b: 30 };
+      const all = series.flatMap((s) => s.p), vs = all.map((p) => p.v);
+      let lo, hi;
+      if (def.domain) {
+        lo = def.domain[0]; hi = def.domain[1] === null ? Math.max(def.autoHi, Math.max.apply(null, vs) * 1.1) : def.domain[1];
+        if (Math.max.apply(null, vs) > hi) hi = Math.max.apply(null, vs) * 1.05;
+        if (Math.min.apply(null, vs) < lo) lo = Math.min.apply(null, vs) - 1;
+      } else {
+        const mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs), sp = (mx - mn) || Math.max(1, Math.abs(mx) * 0.05);
+        lo = mn - sp * 0.35; hi = mx + sp * 0.35;
+      }
+      const guide = def.guide === "weight" ? weightGuide(series) : null;
+      if (guide !== null && guide < lo) lo = guide - (hi - lo) * 0.08;
+      let t0 = Math.min.apply(null, all.map((p) => p.t)), t1 = Math.max.apply(null, all.map((p) => p.t));
+      if (t1 - t0 < 86400000) { t0 -= 3 * 86400000; t1 += 3 * 86400000; }
+      const px = (t) => pd.l + ((t - t0) / (t1 - t0)) * (W - pd.l - pd.r);
+      const py = (v) => pd.t + ((hi - v) / (hi - lo)) * (H - pd.t - pd.b);
+      let g = "";
+      (def.bands || []).forEach((b) => {
+        const yTop = py(Math.min(b.hi, hi)), yBot = py(Math.max(b.lo, lo));
+        if (yBot > yTop) g += `<rect x="${pd.l}" y="${yTop.toFixed(1)}" width="${W - pd.l - pd.r}" height="${(yBot - yTop).toFixed(1)}" fill="${BAND_FILL[b.lvl][0]}" fill-opacity="${BAND_FILL[b.lvl][1]}"/>`;
+      });
+      if (!mini) {
+        for (let i = 0; i <= 4; i++) {
+          const v = lo + ((hi - lo) * i) / 4, y = py(v);
+          g += `<line x1="${pd.l}" x2="${W - pd.r}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#e3e4df" stroke-width="1"/><text x="${pd.l - 6}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="11" fill="#647d8c">${fmtNum(v, Math.abs((hi - lo) / 4 - Math.round((hi - lo) / 4)) < 1e-6 ? def.dec : Math.max(def.dec, 1))}</text>`;
+        }
+        const long = t1 - t0 > 300 * 86400000;
+        for (let i = 0; i <= 4; i++) {
+          const t = t0 + ((t1 - t0) * i) / 4;
+          const lab = new Date(t).toLocaleDateString("fr-FR", long ? { month: "short", year: "2-digit" } : { day: "2-digit", month: "2-digit" });
+          g += `<text x="${px(t).toFixed(1)}" y="${H - 8}" text-anchor="${i === 0 ? "start" : i === 4 ? "end" : "middle"}" font-size="11" fill="#647d8c">${lab}</text>`;
+        }
+      }
+      if (guide !== null) g += `<line x1="${pd.l}" x2="${W - pd.r}" y1="${py(guide).toFixed(1)}" y2="${py(guide).toFixed(1)}" stroke="#9e4737" stroke-width="1.2" stroke-dasharray="5 4"/>${mini ? "" : `<text x="${W - pd.r}" y="${(py(guide) - 4).toFixed(1)}" text-anchor="end" font-size="10.5" fill="#9e4737">−5 % sur 30 j</text>`}`;
+      series.forEach((s) => {
+        const pts = s.p.map((p) => `${px(p.t).toFixed(1)},${py(p.v).toFixed(1)}`).join(" ");
+        if (s.p.length > 1) g += `<polyline points="${pts}" fill="none" stroke="#2f4b5c" stroke-width="${mini ? 1.6 : 2}" ${s.dash ? 'stroke-dasharray="5 4" opacity="0.7"' : ""} stroke-linejoin="round" stroke-linecap="round"/>`;
+        s.p.forEach((p, i) => {
+          const z = zoneOf(def, p.v), col = z === null ? "#2f4b5c" : LVL_COL[z], isLast = i === s.p.length - 1;
+          g += `<circle cx="${px(p.t).toFixed(1)}" cy="${py(p.v).toFixed(1)}" r="${mini ? (isLast ? 3 : 1.8) : (isLast ? 6 : 4.5)}" fill="${col}" stroke="#fffefa" stroke-width="${mini ? 1 : 1.8}"><title>${frDate(new Date(p.t).toISOString())} · ${fmtNum(p.v, def.dec)} ${def.unit}${p.who ? " · " + p.who : ""}</title></circle>`;
+          if (!mini && isLast) g += `<text x="${Math.min(px(p.t), W - pd.r - 2).toFixed(1)}" y="${(py(p.v) - 11).toFixed(1)}" text-anchor="${px(p.t) > W - 60 ? "end" : "middle"}" font-size="12" font-weight="700" fill="${col}">${fmtNum(p.v, def.dec)}</text>`;
+        });
+      });
+      const label = `${def.label} : ${all.length} mesure(s), dernière ${fmtNum(all[all.length - 1].v, def.dec)} ${def.unit}`;
+      return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="${label}">${g}</svg>`;
+    }
+    function trendInfo(def, series) {
+      const p = series[0].p, last = p[p.length - 1], prev = p.length > 1 ? p[p.length - 2] : null;
+      const z = zoneOf(def, last.v);
+      if (!prev) return { last, prev: null, z, txt: "1re mesure", cls: "text-slateink-muted", arrow: "" };
+      const d = last.v - prev.v, eps = Math.pow(10, -def.dec) / 2;
+      if (Math.abs(d) < eps) return { last, prev, z, txt: "stable", cls: "text-slateink-muted", arrow: "→" };
+      const worse = def.better === "up" ? d < 0 : def.better === "down" ? d > 0 : false;
+      const good = def.better === "up" ? d > 0 : def.better === "down" ? d < 0 : false;
+      return { last, prev, z, txt: `${d > 0 ? "+" : "−"}${fmtNum(Math.abs(d), def.dec)}${def.unit.startsWith("/") || def.unit === "%" ? "" : " "}${def.unit} depuis le ${frDate(new Date(prev.t).toISOString())}`, cls: worse ? "text-coral-dark" : good ? "text-sage-dark" : "text-slateink-mid", arrow: d > 0 ? "↑" : "↓" };
+    }
+    function curveItems(patient, days) {
+      return CURVES.map((def) => {
+        const series = curveSeries(patient.id, def, days);
+        return { def, series, n: series.length ? Math.max.apply(null, series.map((s) => s.p.length)) : 0 };
+      });
+    }
+    function setCurve(k) { state.curveKey = k; renderApp(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    function setCurveRange(r) { state.curveRange = r; renderApp(); }
+    function openCurve(k) { state.curveKey = k; state.activeSubView = "followup"; renderApp(); window.scrollTo({ top: 0 }); }
+    function openDomainCurve(code) {
+      const it = curveItems(getActivePatient(), Infinity).find((x) => x.def.dom === code && x.n > 0);
+      if (it) openCurve(it.def.key);
+      else showToast("Pas encore de mesure chiffrée pour ce domaine : il est suivi par les observations de l'aidant.", "warn");
+    }
+    function openEventFromHome(pid, code) { state.activeSubView = "events"; openEvent(pid, code); }
+
     function renderFollowupView(patient) {
+      const range = state.curveRange || "all", days = range === "all" ? Infinity : Number(range);
+      const items = curveItems(patient, days), withData = items.filter((i) => i.n > 0);
+      const sel = items.find((i) => i.def.key === state.curveKey && i.n > 0) || withData.find((i) => i.n >= 2) || withData[0];
+      const rangeBtn = (r, t) => `<button type="button" onclick="setCurveRange('${r}')" class="px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${range === r ? "bg-slateink-dark text-white border-slateink-dark" : "bg-ivory text-slateink-dark border-borderline hover:bg-sand"}">${t}</button>`;
+      const chips = withData.map((i) => `<button type="button" onclick="setCurve('${i.def.key}')" class="tap-card px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${sel && sel.def.key === i.def.key ? "bg-tealatlas-dark text-white border-tealatlas-dark" : "bg-paper text-slateink-dark border-borderline hover:bg-sand"}">${i.def.label} <span class="opacity-70">· ${i.n}</span></button>`).join("");
+      let main = "";
+      if (!sel) {
+        main = `<div class="p-6 rounded-2xl bg-paper border border-borderline text-center space-y-1"><p class="text-sm font-extrabold text-slateink-dark">Aucune mesure sur cette période</p><p class="text-xs text-slateink-muted">Les courbes se construisent avec les visites de l'aide-soignante (poids, scores, marche, tension…) : chaque visite ajoute un point. Pour un dossier existant, chargez l'historique des mesures depuis « Tous les patients ».</p></div>`;
+      } else {
+        const ti = trendInfo(sel.def, sel.series), lvl = ti.z;
+        const lastPt = ti.last;
+        const legend = (sel.def.bands || []).slice().reverse().map((b) => `<span class="inline-flex items-center gap-1 text-[11px] text-slateink-mid"><span class="inline-block w-3 h-3 rounded-sm" style="background:${BAND_FILL[b.lvl][0]};opacity:${Math.min(1, BAND_FILL[b.lvl][1] * 3)}"></span>${b.t}</span>`).join("");
+        const sLegend = sel.series.length > 1 ? sel.series.map((s) => `<span class="text-[11px] text-slateink-mid"><span class="inline-block w-5 border-t-2 ${s.dash ? "border-dashed" : ""} border-slateink-dark align-middle mr-1"></span>${s.name}</span>`).join("") : "";
+        let ho = "";
+        if (sel.def.key === "pas" && sel.series.length === 2) {
+          const l = sel.series[0].p, s = sel.series[1].p;
+          const lastL = l[l.length - 1], lastS = s[s.length - 1];
+          if (lastL && lastS && Math.abs(lastL.t - lastS.t) < 36e5 * 6) { const dr = lastL.v - lastS.v; ho = `<p class="text-xs ${dr >= 20 ? "text-coral-dark font-bold" : "text-slateink-mid"}">Chute au lever : ${dr} mmHg${dr >= 20 ? " (hypotension orthostatique)" : ""}</p>`; }
+        }
+        main = `<div class="p-4 sm:p-5 rounded-2xl bg-paper border border-borderline space-y-3">
+          <div class="flex flex-wrap items-end justify-between gap-2">
+            <div><p class="text-[11px] font-bold uppercase tracking-wider text-slateink-muted">${sel.def.dom} · ${(DOMAINS_META.find((m) => m.code === sel.def.dom) || {}).shortName || ""}</p>
+            <h3 class="font-editorial text-xl text-slateink-dark">${sel.def.label}</h3></div>
+            <div class="text-right"><span class="text-2xl font-extrabold" style="color:${lvl === null ? "#2f4b5c" : LVL_COL[lvl]}">${sel.series.length === 1 ? fmtNum(lastPt.v, sel.def.dec) : ""}</span> <span class="text-xs text-slateink-muted">${sel.series.length === 1 ? sel.def.unit : ""}</span>
+            ${sel.series.length === 1 ? `<p class="text-xs font-bold ${ti.cls}">${ti.arrow} ${ti.txt}</p>` : ""}</div>
+          </div>
+          ${chartSvg(sel.def, sel.series, false)}
+          ${sel.n < 2 ? `<p class="text-xs text-amberwarm-dark font-bold">Une seule mesure pour l'instant : la courbe apparaît dès la deuxième.</p>` : ""}
+          ${ho}
+          <div class="flex flex-wrap gap-x-4 gap-y-1">${sLegend}${legend}</div>
+          ${sel.def.bands ? `<p class="text-[11px] text-slateink-muted">Zones colorées = seuils de GeriaFlow (provisoires, à valider avec l'équipe).</p>` : ""}
+        </div>`;
+      }
+      const minis = withData.map((i) => {
+        const ti = trendInfo(i.def, i.series), isSel = sel && sel.def.key === i.def.key;
+        return `<button type="button" onclick="setCurve('${i.def.key}')" class="tap-card text-left p-3 rounded-2xl bg-paper border ${isSel ? "border-tealatlas-dark ring-2 ring-tealatlas/30" : "border-borderline"} cursor-pointer">
+          <div class="flex items-start justify-between gap-1"><span class="text-[11px] font-bold text-slateink-mid leading-tight">${i.def.label}</span>
+          <span class="text-sm font-extrabold shrink-0" style="color:${ti.z === null ? "#2f4b5c" : LVL_COL[ti.z]}">${i.series.length === 1 ? fmtNum(ti.last.v, i.def.dec) : ""}</span></div>
+          ${chartSvg(i.def, i.series, true)}
+          <p class="text-[10.5px] ${i.series.length === 1 ? ti.cls : "text-slateink-muted"}">${i.series.length === 1 ? ti.arrow + " " + ti.txt : i.n + " mesures"}</p></button>`;
+      }).join("");
+      // Historique : niveau de chaque domaine à chaque saisie
       const cell = ["bg-sage-light text-sage-dark", "bg-sand text-slateink-mid", "bg-amberwarm-light text-amberwarm-dark", "bg-coral-light text-coral-dark"];
-      const vs = (patient.visits || []).slice().reverse();
+      const vs = (patient.visits || []).slice().sort((a, b) => (a.at < b.at ? 1 : -1));
       const head = DOMAINS_META.map((m) => `<th class="px-1 text-[10px] font-bold text-slateink-muted">${m.code}</th>`).join("");
-      const rows = vs.map((v) => `<tr class="border-t border-borderline"><td class="py-1.5 pr-2 text-[11px] text-slateink-dark whitespace-nowrap">${new Date(v.at).toLocaleDateString("fr-FR")} · ${v.author.split(" (")[0]}</td>${DOMAINS_META.map((m) => `<td class="px-0.5 text-center"><span class="inline-block w-6 rounded py-0.5 text-[11px] font-bold ${cell[v.levels[m.code] || 0]}">${v.levels[m.code] || 0}</span></td>`).join("")}</tr>`).join("");
-      const w = (state.observations || []).filter((o) => o.pid === patient.id && o.key === "weight").map((o) => `${new Date(o.at).toLocaleDateString("fr-FR")} : ${o.value} kg`);
-      return `<div class="animate-view max-w-3xl mx-auto space-y-3"><div><h2 class="font-editorial text-2xl text-slateink-dark">Suivi · ${patient.name}</h2><p class="text-xs text-slateink-muted mt-1">Une ligne par saisie : niveau de chaque domaine (0 vert, 1 vigilance, 2 orange, 3 rouge). ${vs.length} saisie(s).</p></div>
-        <div class="p-4 rounded-2xl bg-paper border border-borderline overflow-x-auto">${rows ? `<table class="w-full"><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table>` : '<p class="text-sm text-slateink-muted">Aucune saisie enregistrée pour ce dossier.</p>'}</div>
-        <div class="p-4 rounded-2xl bg-paper border border-borderline"><h3 class="text-sm font-extrabold text-slateink-dark">Poids relevés</h3><p class="text-xs text-slateink-mid mt-1">${w.length ? w.join(" · ") : "Aucun poids relevé."}</p></div></div>`;
+      const rows = vs.map((v) => `<tr class="border-t border-borderline"><td class="py-1.5 pr-2 text-[11px] text-slateink-dark whitespace-nowrap">${frDate(v.at)} · ${v.author.split(" (")[0]}</td>${DOMAINS_META.map((m) => `<td class="px-0.5 text-center"><span class="inline-block w-6 rounded py-0.5 text-[11px] font-bold ${cell[v.levels[m.code] || 0]}">${v.levels[m.code] || 0}</span></td>`).join("")}</tr>`).join("");
+      return `<div class="animate-view max-w-4xl mx-auto space-y-4">
+        <div class="flex flex-wrap items-end justify-between gap-2"><div><h2 class="font-editorial text-2xl text-slateink-dark">Courbes de suivi · ${patient.name}</h2>
+        <p class="text-xs text-slateink-muted mt-0.5">Chaque point est une mesure datée. Touchez une courbe pour l'agrandir.</p></div>
+        <div class="flex gap-1.5">${rangeBtn("90", "3 mois")}${rangeBtn("180", "6 mois")}${rangeBtn("all", "Tout")}</div></div>
+        ${withData.length ? `<div class="flex flex-wrap gap-1.5">${chips}</div>` : ""}
+        ${main}
+        ${withData.length > 1 ? `<div><h3 class="text-sm font-extrabold text-slateink-dark mb-2">Toutes les mesures</h3><div class="grid grid-cols-2 md:grid-cols-3 gap-2.5">${minis}</div></div>` : ""}
+        <details class="p-4 rounded-2xl bg-paper border border-borderline"><summary class="text-sm font-extrabold text-slateink-dark cursor-pointer">Historique des saisies · niveau de chaque domaine (${vs.length})</summary>
+        <p class="text-xs text-slateink-muted mt-2">0 vert · 1 vigilance · 2 orange · 3 rouge.</p>
+        <div class="overflow-x-auto mt-2">${rows ? `<table class="w-full"><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table>` : '<p class="text-sm text-slateink-muted">Aucune saisie enregistrée pour ce patient.</p>'}</div></details></div>`;
+    }
+
+    // ---- Accueil médecin : d'abord ce qui est à traiter, puis l'évolution ----
+    function levelSpark(patient, code) {
+      const v = (patient.visits || []).slice().sort((a, b) => (a.at < b.at ? -1 : 1)).map((x) => x.levels && x.levels[code]).filter((x) => x !== undefined);
+      if (v.length < 2) return { svg: "", arrow: "" };
+      const w = 56, h = 18, pts = v.slice(-8).map((l, i, arr) => `${(2 + (i * (w - 4)) / Math.max(1, arr.length - 1)).toFixed(1)},${(h - 2 - (l / 3) * (h - 4)).toFixed(1)}`).join(" ");
+      const d = v[v.length - 1] - v[v.length - 2];
+      return { svg: `<svg viewBox="0 0 ${w} ${h}" class="w-14 h-[18px]" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="#2f4b5c" stroke-width="1.6" stroke-linejoin="round"/></svg>`, arrow: d > 0 ? `<span class="text-coral-dark font-extrabold" title="Aggravation depuis la saisie précédente">↑</span>` : d < 0 ? `<span class="text-sage-dark font-extrabold" title="Amélioration depuis la saisie précédente">↓</span>` : `<span class="text-slateink-muted">→</span>` };
+    }
+    function renderDoctorOverview(patient, evalRes) {
+      const { domainCards } = evalRes;
+      const lvlName = ["Vert", "Vigilance", "Orange", "Rouge"];
+      const lvlChip = ["bg-sage-light text-sage-dark", "bg-sand text-slateink-mid", "bg-amberwarm-dark text-white", "bg-coral-dark text-white"];
+      const evs = allEvents().filter((e) => e.p.id === patient.id);
+      const pend = pendingLong(patient);
+      const lastD = lastObsDate(patient.id), dsl = daysSince(lastD);
+
+      const safety = patient.safety ? `<div class="p-3.5 rounded-2xl bg-coral-light border-2 border-coral text-sm font-extrabold text-coral-dark">Idées de mort signalées : appeler le patient et l'entourage aujourd'hui.</div>` : "";
+      const evRows = evs.slice(0, 3).map(({ p, c, w, origin }) => {
+        const st = w.docStatus === "a_voir" ? (w.explored ? "Exploré · décision attendue" : "À explorer") : "Prise en charge en cours";
+        return `<li class="flex items-center justify-between gap-3 p-3 rounded-2xl bg-paper border ${c.level >= 3 ? "border-coral" : "border-amberwarm"}">
+          <div class="min-w-0"><div class="flex flex-wrap items-center gap-1.5"><span class="text-sm font-extrabold text-slateink-dark">${c.shortName}</span><span class="px-2 py-0.5 rounded-md text-[11px] font-extrabold ${lvlChip[c.level]}">${lvlName[c.level]}</span><span class="text-[11px] text-slateink-muted">${st}</span></div>
+          <p class="text-xs text-slateink-mid mt-0.5 truncate" title="${c.evidence}">${c.evidence}</p>
+          <p class="text-[11px] text-slateink-muted">Lancée par : ${origin.join(", ")}</p></div>
+          <button type="button" onclick="openEventFromHome('${p.id}','${c.code}')" class="tap-card shrink-0 px-3 py-2 rounded-xl bg-slateink-dark text-white text-xs font-bold cursor-pointer">Ouvrir</button></li>`;
+      }).join("");
+      const moreEv = evs.length > 3 ? `<li><button type="button" onclick="switchSubView('events')" class="w-full p-2.5 rounded-2xl border border-dashed border-borderline text-xs font-bold text-tealatlas-dark cursor-pointer">Voir les ${evs.length - 3} autres événements →</button></li>` : "";
+      const pendRows = pend.map((c) => `<li class="flex items-center justify-between gap-3 p-3 rounded-2xl bg-paper border border-tealatlas">
+          <div><span class="text-sm font-extrabold text-slateink-dark">Compléter : ${c.long}</span><p class="text-[11px] text-slateink-muted">Déclenché par ${c.short} (${c.rule})</p></div>
+          <button type="button" onclick="switchSubView('cascade')" class="tap-card shrink-0 px-3 py-2 rounded-xl bg-tealatlas-dark text-white text-xs font-bold cursor-pointer">Faire</button></li>`).join("");
+      const todo = (evRows || pendRows)
+        ? `<ul class="space-y-2">${evRows}${moreEv}${pendRows}</ul>`
+        : `<div class="p-4 rounded-2xl bg-sage-light/70 border border-sage"><p class="text-sm font-extrabold text-sage-dark">Rien à traiter pour ce patient</p><p class="text-xs text-slateink-mid mt-0.5">Aucun domaine orange ou rouge, aucun outil complet en attente.</p></div>`;
+
+      const tiles = curveItems(patient, Infinity).filter((i) => i.n > 0).map((i) => ({ ...i, ti: trendInfo(i.def, i.series) }))
+        .sort((a, b) => (b.ti.z === null ? -1 : b.ti.z) - (a.ti.z === null ? -1 : a.ti.z) || b.n - a.n).slice(0, 6)
+        .map((i) => `<button type="button" onclick="openCurve('${i.def.key}')" class="tap-card text-left p-3 rounded-2xl bg-paper border border-borderline cursor-pointer">
+          <div class="flex items-start justify-between gap-1"><span class="text-[11px] font-bold text-slateink-mid leading-tight">${i.def.label}</span><span class="text-sm font-extrabold shrink-0" style="color:${i.ti.z === null ? "#2f4b5c" : LVL_COL[i.ti.z]}">${i.series.length === 1 ? fmtNum(i.ti.last.v, i.def.dec) : ""}</span></div>
+          ${chartSvg(i.def, i.series, true)}
+          <p class="text-[10.5px] ${i.series.length === 1 ? i.ti.cls : "text-slateink-muted"}">${i.series.length === 1 ? i.ti.arrow + " " + i.ti.txt : i.n + " mesures"}</p></button>`).join("");
+
+      const sorted = domainCards.slice().sort((a, b) => b.level - a.level);
+      const dom = sorted.map((c) => {
+        const sp = levelSpark(patient, c.code), calm = c.level === 0;
+        return `<button type="button" onclick="openDomainCurve('${c.code}')" class="tap-card text-left p-3 rounded-2xl border ${c.level >= 3 ? "border-coral bg-coral-light/30" : c.level === 2 ? "border-amberwarm bg-amberwarm-light/40" : "border-borderline bg-paper"} ${calm ? "opacity-80" : ""} cursor-pointer">
+          <div class="flex items-center justify-between gap-2"><span class="text-xs font-extrabold text-slateink-dark leading-tight">${c.shortName}</span><span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${lvlChip[c.level]}">${lvlName[c.level]}</span></div>
+          ${calm ? "" : `<p class="text-[11px] text-slateink-mid mt-1 leading-snug" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${c.evidence}</p>`}
+          <div class="flex items-center justify-between mt-1.5 h-[18px]">${sp.svg || '<span class="text-[10px] text-slateink-muted">1re saisie</span>'}${sp.arrow}${c.hasDiscordance ? '<span class="text-[10px] font-extrabold text-lavender-dark">Écart famille/AS</span>' : ""}</div></button>`;
+      }).join("");
+
+      return `<div class="animate-view space-y-5">
+        ${safety}
+        <section class="space-y-2"><div class="flex items-baseline justify-between gap-2"><h3 class="font-editorial text-xl text-slateink-dark">À traiter</h3><span class="text-[11px] text-slateink-muted">${dsl === null ? "Aucune saisie pour l'instant" : "Dernière saisie il y a " + dsl + " j"}</span></div>${todo}</section>
+        ${tiles ? `<section class="space-y-2"><div class="flex items-baseline justify-between gap-2"><h3 class="font-editorial text-xl text-slateink-dark">Évolution des mesures</h3><button type="button" onclick="switchSubView('followup')" class="text-xs font-bold text-tealatlas-dark underline cursor-pointer">Toutes les courbes →</button></div><div class="grid grid-cols-2 md:grid-cols-3 gap-2.5">${tiles}</div></section>` : ""}
+        <section class="space-y-2"><div class="flex items-baseline justify-between gap-2"><h3 class="font-editorial text-xl text-slateink-dark">12 domaines</h3><span class="text-[11px] text-slateink-muted">Du plus au moins urgent · touchez pour voir la courbe</span></div><div class="grid grid-cols-2 lg:grid-cols-3 gap-2.5">${dom}</div></section>
+      </div>`;
+    }
+
+    // ---- Historique de mesures importé (CSV) : pour les dossiers réels du pré-test ----
+    const HIST_MAP = {
+      poids: ["D02", "weight"], weight: ["D02", "weight"], mini_mna: ["D02", "miniMnaSf"], minimna: ["D02", "miniMnaSf"], mna: ["D02", "mnaFull"], mollet: ["D02", "calfCm"],
+      mini_gds: ["D07", "miniGds"], minigds: ["D07", "miniGds"], gds15: ["D07", "gds15"], gds: ["D07", "gds15"],
+      leve_chaise: ["D01", "chairStand5"], marche_4m: ["D01", "walkTime4m"], rappel: ["D06", "recall4"],
+      adl: ["D08", "adl"], iadl: ["D08", "iadl"], observance: ["D11", "adherencePct"],
+      pas_couche: ["D12", "pasLying"], pas_debout: ["D12", "pasStand1"], spo2: ["D12", "spo2"], temp: ["D12", "temp"], temperature: ["D12", "temp"]
+    };
+    function parseDateAny(s) {
+      s = String(s || "").trim();
+      let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3], 9, 0, 0);
+      m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);
+      if (m) return new Date(+m[3], +m[2] - 1, +m[1], 9, 0, 0);
+      return null;
+    }
+    function parseHistoryCsv(text) {
+      const lines = text.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
+      const res = { n: 0, missing: [], badDate: 0, badMeasure: [] };
+      if (lines.length < 2) return res;
+      const sep = lines[0].includes(";") ? ";" : ",";
+      const cut = (l) => l.split(sep).map((c) => c.trim().replace(/^"|"$/g, ""));
+      const head = cut(lines[0]).map(norm);
+      const iC = head.findIndex((h) => ["code", "nom", "patient", "id"].includes(h)), iD = head.findIndex((h) => h === "date"), iM = head.findIndex((h) => ["mesure", "measure", "cle"].includes(h)), iV = head.findIndex((h) => ["valeur", "value"].includes(h));
+      if (iC < 0 || iD < 0 || iM < 0 || iV < 0) return Object.assign(res, { n: -1 });
+      const touched = new Set();
+      lines.slice(1).forEach((l) => {
+        const r = cut(l), pat = state.patients.find((p) => norm(p.name) === norm(r[iC]));
+        if (!pat) { if (r[iC] && !res.missing.includes(r[iC])) res.missing.push(r[iC]); return; }
+        const d = parseDateAny(r[iD]);
+        if (!d || d.getTime() > Date.now()) { res.badDate++; return; }
+        const map = HIST_MAP[norm(r[iM]).replace(/[\s-]+/g, "_")];
+        const v = Number(String(r[iV]).replace(",", "."));
+        if (!map || !isFinite(v)) { if (!map && !res.badMeasure.includes(r[iM])) res.badMeasure.push(r[iM]); return; }
+        logObs(pat, "doctor", "Import historique", map[0], map[1], v, d.toISOString());
+        touched.add(pat.id); res.n++;
+      });
+      state.observations.sort((a, b) => (a.at < b.at ? -1 : 1));
+      touched.forEach((pid) => markDirty(pid));
+      if (res.n) saveState();
+      return res;
+    }
+    function importHistoryCsv(input) {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => {
+        const r = parseHistoryCsv(String(rd.result));
+        renderApp();
+        if (r.n === -1) return showToast("Colonnes attendues : code, date, mesure, valeur.", "warn");
+        const extra = (r.missing.length ? ` Dossiers inconnus : ${r.missing.join(", ")}.` : "") + (r.badMeasure.length ? ` Mesures non reconnues : ${r.badMeasure.join(", ")}.` : "") + (r.badDate ? ` ${r.badDate} date(s) invalide(s) ou future(s).` : "");
+        showToast(`${r.n} mesure(s) ajoutée(s) à l'historique.${extra}`, extra ? "warn" : "info");
+      };
+      rd.readAsText(f);
+    }
+
+    // ---- Menu secondaire du médecin (mobile) ----
+    function renderMoreView(items) {
+      return `<div class="animate-view max-w-xl mx-auto space-y-2"><h2 class="font-editorial text-2xl text-slateink-dark">Plus</h2>${items.map((i) => `<button type="button" onclick="switchSubView('${i.key}')" class="tap-card w-full text-left p-4 rounded-2xl bg-paper border border-borderline cursor-pointer"><span class="text-sm font-extrabold text-slateink-dark">${i.label}</span>${i.badge !== "" ? `<span class="ml-2 text-[11px] text-slateink-muted">(${i.badge})</span>` : ""}</button>`).join("")}</div>`;
     }
 
     function renderApp() {
@@ -3992,7 +4172,9 @@ CREATE POLICY "Acces prototype lecture ecriture"
 
       const container = document.getElementById("app-view-container");
       if (state.currentRole === "doctor") {
-        if (state.activeSubView === "followup") {
+        if (state.activeSubView === "more") {
+          container.innerHTML = renderMoreView(state._moreItems || []);
+        } else if (state.activeSubView === "followup") {
           container.innerHTML = renderFollowupView(patient);
         } else if (state.activeSubView === "events") {
           container.innerHTML = renderEventsView();
